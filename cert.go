@@ -1,4 +1,4 @@
-package mitm
+package krmitm
 
 import (
 	"crypto/ecdsa"
