@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"sync"
 	"time"
 )
@@ -18,6 +17,8 @@ type Proxy struct {
 	// Wrap specifies a function for optionally wrapping upstream for
 	// inspecting the decrypted HTTP request and response.
 	Wrap func(upstream http.Handler) http.Handler
+
+	WrapTLS func(upstream http.Handler) http.Handler
 
 	// CA specifies the root CA for generating leaf certs for each incoming
 	// TLS request.
@@ -43,25 +44,26 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.serveConnect(w, r)
 		return
 	}
+	/*
 	rp := &httputil.ReverseProxy{
 		Director:      httpDirector,
 		FlushInterval: p.FlushInterval,
-	}
-	p.Wrap(rp).ServeHTTP(w, r)
+	}*/
+	p.Wrap(nil).ServeHTTP(w, r)
 }
 
 func (p *Proxy) serveConnect(w http.ResponseWriter, r *http.Request) {
 	var (
 		err   error
-		sconn *tls.Conn
+		//sconn *tls.Conn
 		name  = dnsName(r.Host)
 	)
 
-	if name == "" {
+/*	if name == "" {
 		log.Println("cannot determine cert name for " + r.Host)
 		http.Error(w, "no upstream", 503)
 		return
-	}
+	}*/
 
 	provisionalCert, err := p.cert(name)
 	if err != nil {
@@ -81,11 +83,11 @@ func (p *Proxy) serveConnect(w http.ResponseWriter, r *http.Request) {
 			*cConfig = *p.TLSClientConfig
 		}
 		cConfig.ServerName = hello.ServerName
-		sconn, err = tls.Dial("tcp", r.Host, cConfig)
+		/*sconn, err = tls.Dial("tcp", r.Host, cConfig)
 		if err != nil {
 			log.Println("dial", r.Host, err)
 			return nil, err
-		}
+		}*/
 		return p.cert(hello.ServerName)
 	}
 
@@ -95,22 +97,22 @@ func (p *Proxy) serveConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer cconn.Close()
-	if sconn == nil {
-		log.Println("could not determine cert name for " + r.Host)
-		return
-	}
-	defer sconn.Close()
+	//if sconn == nil {
+	//	log.Println("could not determine cert name for " + r.Host)
+	//	return
+	//}
+	//defer sconn.Close()
 
-	od := &oneShotDialer{c: sconn}
-	rp := &httputil.ReverseProxy{
-		Director:      httpsDirector,
-		Transport:     &http.Transport{DialTLS: od.Dial},
-		FlushInterval: p.FlushInterval,
-	}
+	//  od := &oneShotDialer{c: sconn}
+	//  rp := &httputil.ReverseProxy{
+	//	Director:      httpsDirector,
+	//	Transport:     &http.Transport{DialTLS: od.Dial},
+	//	FlushInterval: p.FlushInterval,
+	//  }
 
 	ch := make(chan int)
 	wc := &onCloseConn{cconn, func() { ch <- 0 }}
-	http.Serve(&oneShotListener{wc}, p.Wrap(rp))
+	http.Serve(&oneShotListener{wc}, p.WrapTLS(nil))
 	<-ch
 }
 
