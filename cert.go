@@ -16,7 +16,7 @@ import (
 
 const (
 	caMaxAge   = 5 * 365 * 24 * time.Hour
-	leafMaxAge = 24 * time.Hour
+	leafMaxAge = 90 * 24 * time.Hour
 	caUsage    = x509.KeyUsageDigitalSignature |
 		x509.KeyUsageContentCommitment |
 		x509.KeyUsageKeyEncipherment |
@@ -24,7 +24,7 @@ const (
 		x509.KeyUsageKeyAgreement |
 		x509.KeyUsageCertSign |
 		x509.KeyUsageCRLSign
-	leafUsage = caUsage
+	leafUsage = x509.KeyUsageDigitalSignature
 )
 
 func genCert(ca *tls.Certificate, names []string) (*tls.Certificate, error) {
@@ -43,9 +43,10 @@ func genCert(ca *tls.Certificate, names []string) (*tls.Certificate, error) {
 		NotBefore:             now,
 		NotAfter:              now.Add(leafMaxAge),
 		KeyUsage:              leafUsage,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth,x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 		DNSNames:              names,
-		SignatureAlgorithm:    x509.ECDSAWithSHA512,
+		SignatureAlgorithm:    x509.ECDSAWithSHA256,
 	}
 	key, err := genKeyPair()
 	if err != nil {
@@ -63,7 +64,7 @@ func genCert(ca *tls.Certificate, names []string) (*tls.Certificate, error) {
 }
 
 func genKeyPair() (*ecdsa.PrivateKey, error) {
-	return ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 }
 
 func GenCA(name string) (certPEM, keyPEM []byte, err error) {
@@ -74,10 +75,11 @@ func GenCA(name string) (certPEM, keyPEM []byte, err error) {
 		NotBefore:             now,
 		NotAfter:              now.Add(caMaxAge),
 		KeyUsage:              caUsage,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 		BasicConstraintsValid: true,
 		IsCA:               true,
 		MaxPathLen:         2,
-		SignatureAlgorithm: x509.ECDSAWithSHA512,
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
 	key, err := genKeyPair()
 	if err != nil {
